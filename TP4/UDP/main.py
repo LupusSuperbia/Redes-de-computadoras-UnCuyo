@@ -3,6 +3,15 @@ import threading
 
 BROADCAST_IP = "255.255.255.255"
 PORT = 60000
+
+'''
+_create_udp_socket : 
+- Se encarga de la configuracion del socket para poder ser usado tanto por el proceso que envia 
+los datos al broadcast como el proceso que esta escuchando los datos que se estan enviando
+al broadcast y al puerto, se utilizan funciones del import donde se setea las opciones
+del socket, una es para donde va a mandar los mensajes que este seria el SO_BROADCAST 
+y el otro es para que obtenga los paquetes y la direccion de donde la envian SO_REUSADDR
+'''
 def _create_udp_socket(bind=False):
     sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -13,7 +22,7 @@ def _create_udp_socket(bind=False):
 
 
 def _set_name(): 
-    print("Ingresa tu nombre:\n")
+    print("Ingresa tu nombre:")
     username = input()
     return username 
 
@@ -32,7 +41,7 @@ def send_to_udp(name):
     try : 
         while True : 
             msg = input("¬ ")
-            message = f"El usuario [{name}] dice  : {msg}"
+            message = f"El usuario {name} dice : {msg}"
             sock.sendto(message.encode(), (BROADCAST_IP, PORT))
             if msg.lower() == "exit": 
                 leave_chat(name, sock)
@@ -43,8 +52,8 @@ def listen_udp():
     sock = _create_udp_socket(bind=True)
     print("Escuchando  la LAN 49.44 : ")
     while True : 
-        data, addr = sock.recvfrom(1024)
-        print(f"{data.decode()} ({addr[0]})")
+        (data, (address, port)) = sock.recvfrom(1024)
+        print(f"{data.decode()} ({address}:{port})")
 
 if __name__ == "__main__" : 
     name = _set_name()
