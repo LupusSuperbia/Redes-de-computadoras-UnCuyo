@@ -21,7 +21,7 @@ def send_msg(client_socket, name):
             msg = input("#")
             if msg.lower() == 'desconectar': 
                 print(f"{name.upper()} te has desconectado ")
-                client_socket.close()
+               
                 break
             msg_complete = f"Cliente {name} dice : {msg}"
             client_socket.send(msg_complete.encode())
@@ -43,7 +43,7 @@ def listen_server(client_socket):
         client_socket.close()
 
 if __name__ == "__main__":
-    client_socket = connect_socket('127.0.0.1', 60000)
+    client_socket = connect_socket('10.65.1.27', 60000)
     name = input("Ingresa tu nombre porfavor:")
     send_msg_join(client_socket, name)
     threading.Thread(target=send_msg, args=(client_socket, name)).start()

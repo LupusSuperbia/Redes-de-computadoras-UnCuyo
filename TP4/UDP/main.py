@@ -17,7 +17,7 @@ def _create_udp_socket(bind=False):
     sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     if bind : 
-        sock_udp.bind(('', PORT))
+        sock_udp.bind(("", PORT))
     return sock_udp
 
 
@@ -58,4 +58,4 @@ def listen_udp():
 if __name__ == "__main__" : 
     name = _set_name()
     threading.Thread(target=listen_udp, daemon=True).start()
-    send_to_udp(name)
+    threading.Thread(target=send_to_udp, args=(name,)).start()
