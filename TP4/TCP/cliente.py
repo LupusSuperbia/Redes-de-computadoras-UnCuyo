@@ -15,16 +15,16 @@ def send_msg_join(client_socket, name):
         print(e)
 
 
-def send_msg(client_socket, name):
+def send_msg(client_socket):
     try : 
         while True : 
             msg = input("#")
             if msg.lower() == 'desconectar': 
-                print(f"{name.upper()} te has desconectado ")
+                print(f"te has desconectado")
                
                 break
-            msg_complete = f"Cliente {name} dice : {msg}"
-            client_socket.send(msg_complete.encode())
+            msg_complete = msg.encode()
+            client_socket.send(msg_complete)
     except Exception as e : 
         print(e)
     finally : 
@@ -43,8 +43,8 @@ def listen_server(client_socket):
         client_socket.close()
 
 if __name__ == "__main__":
-    client_socket = connect_socket('10.65.1.27', 60000)
-    name = input("Ingresa tu nombre porfavor:")
-    send_msg_join(client_socket, name)
-    threading.Thread(target=send_msg, args=(client_socket, name)).start()
-    threading.Thread(target=listen_server, args=(client_socket, ), daemon=True).start()
+    client_socket = connect_socket('127.0.0.1', 50000)
+    send= threading.Thread(target=send_msg, args=(client_socket,))
+    send.start()
+    listen = threading.Thread(target=listen_server, args=(client_socket, ), daemon=True)
+    listen.start()
