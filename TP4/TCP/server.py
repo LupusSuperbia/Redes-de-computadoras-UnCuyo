@@ -3,19 +3,145 @@ import socket
 import threading 
 import os 
 import time
+from enum import Enum, auto
+class ServerCommand(Enum):
+    LIST_CLIENTS = '/clients'
+    EXIT = "/exit"
+    
+   # SERVER_SHUTDOWN = auto()
 
-IP_HOST = '0.0.0.0'
-PORT = 60000
-clients_connected = {}
+class ServerTCP: 
+    
 
-def _create_tcp_socket() :
-    socket_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try : 
-        socket_tcp.bind((IP_HOST, PORT))
-        socket_tcp.listen(5)
-    except Exception as e:
-        raise e
-    return socket_tcp 
+    def __init__(self, host, port, listen): 
+        self.port = port 
+        self.host = host 
+        self.listen = listen
+        self.clients_connected = {}
+        self.lock = threading.Lock()
+        self.running = True 
+        self.server_socket = self._create_tcp_socket()
+
+    def _create_tcp_socket(self) :
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try : 
+            server_socket.bind((self.host, self.port))
+            server_socket.listen(self.listen)
+        except Exception as e:
+            raise e
+        return server_socket 
+        
+    def _mainloop_server(self): 
+        print("#################### BIENVENIDOS A LA SALA DE CHAT MAS EPICARDIUM ################")
+        try :  
+            while self.running : 
+                (client_socket, address) = self.server_socket.accept()
+                thread = threading.Thread(target=self.handle_client, args=(client_socket, address))
+                thread.start()
+        except Exception as e : 
+            print("Error: ", e)
+        finally : 
+            self.server_socket.close() 
+    
+
+    def handle_client(self, client_socket, client_address):
+        try: 
+            client_socket.send(("💬Ingresa tu nombre :").encode())
+            data = client_socket.recv(1024)
+            client_name = data.decode().strip()
+            welcome_to_chat = f"#################### BIENVENIDOS A LA SALA DE CHAT MAS EPICARDIUM {client_name} ################"
+            print(welcome_to_chat)
+            client_socket.send(welcome_to_chat.encode())
+            with self.lock : 
+                self.clients_connected[client_address] = {'socket' : client_socket, 'name' : client_name }
+            self.send_message(f"👋 Se ha conectado el cliente : {client_name}", client_address)
+            while True : 
+                data = client_socket.recv(1024)
+                if not data : 
+                    break
+                msg_decode = data.decode()
+                if msg_decode.lower().find('/') != -1  :
+                    
+                    print(f'RECIBIDO EL CLIENTE {self.clients_connected[client_address]['name']} SE HA DESCONECTADO ')
+                    msg = f"SE HA DESCONECTADO UN CLIENTE {self.clients_connected[client_address]['name']} 🏃‍♂️"
+                    self.send_message(msg, client_address)
+
+                    break
+                print(f"Cliente  {client_name} : {msg_decode}")
+                what_to_send = f"{client_name} : {msg_decode}"
+                #client_socket.send(what_to_send.encode('utf-8'))
+                self.send_message(what_to_send, client_address)
+        except Exception as e : 
+            print("Se ha producido un error :", e)
+        finally : 
+            with self.lock : 
+                if client_address in self.clients_connected: 
+                    self.clients_connected.pop(client_address)
+            client_socket.close()
+            print(f'Conexión con {client_name} terminada')
+        
+    def send_message(self, msg, client_address):
+        with self.lock : 
+            clients = self.clients_connected
+            if not clients: 
+                    return 
+            buff_entry_encode = msg.encode()
+            for address, client in clients.items() :
+                if address != client_address : 
+                    client['socket'].send(buff_entry_encode)
+
+    def send_message_server(self):
+        try:
+            while True : 
+                buff = input("#")
+                if buff.lower() in ['exit', 'salir', 'quit']:
+                  if self.disconnect_server(): 
+                    break
+                  else : 
+                    print('No se puede desconectar')  
+                    continue
+                self.send_message_clients(buff)
+        except KeyboardInterrupt as e : 
+            print('Se ha interrupido el servicio con CTRL-C')
+            if self.verify_clients() :
+                print('No hay clientes, se puede esconectar el servidor')
+                return
+            else : 
+                print('Hay clientes conectados al servidor, no se puede desconectar')
+                return 
+        except Exception as e:
+            raise e
+        finally :
+            return
+            
+
+    def verify_clients(self):
+        with self.lock : 
+           return not bool(self.clients_connected)
+            
+    def disconnect_server(self)  :
+        if self.verify_clients(): 
+            buff = "El servidor se ha desconectado"
+            print(buff)
+            self.send_message_clients(buff)
+            self.running = False
+
+            if hasattr(self, 'server_socket'): 
+                self.server_socket.close()
+            return True 
+        else : 
+            print("No se puede desconectar el servidor, ya que posee clientes conectados")
+            return False 
+            
+    def send_message_clients(self, msg):
+        with self.lock : 
+            clients = self.clients_connected
+            if not clients: 
+                return 
+            buff_entry = f"Server : {msg}"
+            buff_entry_encode = buff_entry.encode()
+            for client in self.clients_connected.values() : 
+                client['socket'].send(buff_entry_encode)
 
 def loading(): 
     string = "#"
@@ -32,91 +158,10 @@ def clear_term():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
-
-
-def _mainloop_server(): 
-    socket_server = _create_tcp_socket()
-    print("#################### BIENVENIDOS A LA SALA DE CHAT MAS EPICARDIUM ################")
-    try :  
-        while True : 
-            (socket_client, address) = socket_server.accept()
-            clients_connected[address] = socket_client
-            thread = threading.Thread(target=handle_client, args=(socket_client, address))
-            thread.start()
-    except Exception as e : 
-        raise e
-    finally : 
-        socket_server.close() 
-
-def handle_client(client_socket, client_address):
-    try: 
-        data = client_socket.recv(1024)
-        welcome_to_chat = f"#################### BIENVENIDOS A LA SALA DE CHAT MAS EPICARDIUM {data.decode()} ################"
-        client_socket.send(welcome_to_chat.encode())
-        print(f"Se ha conectado el cliente : {data.decode()}")
-        while True : 
-            data = client_socket.recv(1024)
-            if not data : 
-                break
-            if data.decode('utf-8').lower().find('desconectar') != -1  :
-                print(f'RECIBIDO EL CLIENTE {client_address[1]} SE HA DESCONECTADO')
-                msg = f"SE HA DESCONECTADO UN CLIENTE {client_address[1]}"
-                send_message_clients(clients_connected, msg)
-                clients_connected.pop(client_address)
-                break
-            print(f"Recibido de {data.decode('utf-8')}")
-            what_to_send = f"{client_address[1]} {data.decode('utf-8')}"
-            client_socket.send(what_to_send.encode('utf-8'))
-            send_mensage(clients_connected, what_to_send, client_address)
-    except Exception as e : 
-        raise e
-    finally : 
-        client_socket.close()
-
-def send_mensage(clients, msg, client_address):
-    if not clients: 
-            return 
-    buff_entry_encode = msg.encode()
-    for address, sock in clients.items() :
-        if address != client_address : 
-            sock.send(buff_entry_encode)
-
-def send_mensage_server(clients):
-    try:
-        while True : 
-            buff = input("#")
-            if buff.lower() in ['exit', 'salir', 'quit']:
-                if verify_clients(clients): 
-                    buff = "El servidor se ha desconectado"
-                    print(buff)
-                    send_message_clients(clients, buff)
-                    break
-                else : 
-                    print("No se puede desconectar el servidor, ya que posee clientes conectados")
-            send_message_clients(clients, buff)
-    except Exception as e:
-        raise e
-    finally :
-        verify_clients(clients)
-
-def verify_clients(clients):
-    if not clients : 
-         return True 
-    else : 
-        return False
-        
-
-def send_message_clients(clients, msg):
-    if not clients: 
-        return 
-    buff_entry = f"Server : {msg}"
-    buff_entry_encode = buff_entry.encode()
-    for client in clients.values() : 
-        client.send(buff_entry_encode)
-
 if __name__ == "__main__":
     #loading()
-    server_thread = threading.Thread(target=_mainloop_server)
+    server = ServerTCP('0.0.0.0', 50000, listen=5)
+    server_thread = threading.Thread(target=server._mainloop_server)
     server_thread.start()
-    send = threading.Thread(target=send_mensage_server, args=(clients_connected, ), daemon=True)
+    send = threading.Thread(target=server.send_message_server, daemon=True)
     send.start()
