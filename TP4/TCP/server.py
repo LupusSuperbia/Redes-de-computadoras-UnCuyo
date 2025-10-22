@@ -3,24 +3,19 @@ import socket
 import threading 
 import os 
 import time
-from enum import Enum, auto
-class ServerCommand(Enum):
-    LIST_CLIENTS = '/clients'
-    EXIT = "/exit"
-    
-   # SERVER_SHUTDOWN = auto()
+from Comandos import ServerCommand
+
 
 class ServerTCP: 
     
-
     def __init__(self, host, port, listen): 
         self.port = port 
         self.host = host 
-        self.listen = listen
-        self.clients_connected = {}
-        self.lock = threading.Lock()
-        self.running = True 
-        self.server_socket = self._create_tcp_socket()
+        self.listen = listen #Cuantas conexiones va a permitir el servidor al mismo momento
+        self.clients_connected = {} ## Diccionario (Parecido a una tabla hash para mantener los datos de los clientes conectados)
+        self.lock = threading.Lock() ## Este metodo de threading funciona para que haya problemas con la condicion de carrera, es mas a nivel de concurrencia cuando vemos la lista de los clientes conectados
+        self.running = True  ##Flag que nos permite detener el server en algun momento dado 
+        self.server_socket = self._create_tcp_socket() ## Directamente llamamos al metodo para crear el socket desde el init, asi podemos tener una instancia del server como atributo de nuestra clase, y nos permite el llamado en distintas partes del codigo
 
     def _create_tcp_socket(self) :
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -28,7 +23,7 @@ class ServerTCP:
             server_socket.bind((self.host, self.port))
             server_socket.listen(self.listen)
         except Exception as e:
-            raise e
+            print("Error:", e) 
         return server_socket 
         
     def _mainloop_server(self): 
@@ -38,6 +33,8 @@ class ServerTCP:
                 (client_socket, address) = self.server_socket.accept()
                 thread = threading.Thread(target=self.handle_client, args=(client_socket, address))
                 thread.start()
+        except OSError as o : 
+            print("Se cerro abruptamente le servidor")
         except Exception as e : 
             print("Error: ", e)
         finally : 
@@ -49,8 +46,7 @@ class ServerTCP:
             client_socket.send(("💬Ingresa tu nombre :").encode())
             data = client_socket.recv(1024)
             client_name = data.decode().strip()
-            welcome_to_chat = f"#################### BIENVENIDOS A LA SALA DE CHAT MAS EPICARDIUM {client_name} ################"
-            print(welcome_to_chat)
+            welcome_to_chat = f"=============== BIENVENIDOS A LA SALA DE CHAT MAS EPICARDIUM {client_name}     ==================="
             client_socket.send(welcome_to_chat.encode())
             with self.lock : 
                 self.clients_connected[client_address] = {'socket' : client_socket, 'name' : client_name }
@@ -60,7 +56,7 @@ class ServerTCP:
                 if not data : 
                     break
                 msg_decode = data.decode()
-                if msg_decode.lower().find('/') != -1  :
+                if msg_decode.lower() in ServerCommand.EXIT.value  :
                     
                     print(f'RECIBIDO EL CLIENTE {self.clients_connected[client_address]['name']} SE HA DESCONECTADO ')
                     msg = f"SE HA DESCONECTADO UN CLIENTE {self.clients_connected[client_address]['name']} 🏃‍♂️"
@@ -71,6 +67,8 @@ class ServerTCP:
                 what_to_send = f"{client_name} : {msg_decode}"
                 #client_socket.send(what_to_send.encode('utf-8'))
                 self.send_message(what_to_send, client_address)
+        except ConnectionResetError as cr : 
+            print(f'El cliente {client_name} ha cerrado abruptamente')
         except Exception as e : 
             print("Se ha producido un error :", e)
         finally : 
@@ -82,39 +80,53 @@ class ServerTCP:
         
     def send_message(self, msg, client_address):
         with self.lock : 
-            clients = self.clients_connected
-            if not clients: 
-                    return 
-            buff_entry_encode = msg.encode()
-            for address, client in clients.items() :
-                if address != client_address : 
-                    client['socket'].send(buff_entry_encode)
+            try : 
+                clients = self.clients_connected
+                if not clients: 
+                        return 
+                buff_entry_encode = msg.encode()
+                for address, client in clients.items() :
+                    if address != client_address : 
+                        client['socket'].send(buff_entry_encode)
+            except Exception as e : 
+                print("No se pudo mandar mensaje",)
 
     def send_message_server(self):
-        try:
+        
             while True : 
-                buff = input("#")
-                if buff.lower() in ['exit', 'salir', 'quit']:
-                  if self.disconnect_server(): 
-                    break
-                  else : 
-                    print('No se puede desconectar')  
-                    continue
-                self.send_message_clients(buff)
-        except KeyboardInterrupt as e : 
-            print('Se ha interrupido el servicio con CTRL-C')
-            if self.verify_clients() :
-                print('No hay clientes, se puede esconectar el servidor')
-                return
-            else : 
-                print('Hay clientes conectados al servidor, no se puede desconectar')
-                return 
-        except Exception as e:
-            raise e
-        finally :
-            return
+                try:
+                    buff = input("#").lower()
+                    if buff in ServerCommand.STOP.value:
+                        if self.disconnect_server(): 
+                            break
+                        else : 
+                            continue
+                    elif buff in ServerCommand.LIST_CLIENTS.value : 
+                        self.list_clients()
+                        continue
+                    self.send_message_clients(buff)
+                except OSError as o : 
+                    print("ERROR : ", o)
+                except KeyboardInterrupt as e : 
+                    print('Se ha interrupido el servicio con CTRL-C')
+                    if self.verify_clients() :
+                        print('No hay clientes, se puede esconectar el servidor')
+                    
+                    else : 
+                        print('Hay clientes conectados al servidor, no se puede desconectar')
+                        self.list_clients()
+                         
+                except Exception as e:
+                    print("Error en send message server:", e) 
+                finally :
+                    pass
+       
             
-
+    def list_clients(self):
+        with self.lock: 
+            print('====== CLIENTES CONECTADOS ==== ')
+            for clients in self.clients_connected.values():
+                    print(clients['name'])
     def verify_clients(self):
         with self.lock : 
            return not bool(self.clients_connected)
@@ -123,14 +135,13 @@ class ServerTCP:
         if self.verify_clients(): 
             buff = "El servidor se ha desconectado"
             print(buff)
-            self.send_message_clients(buff)
             self.running = False
-
             if hasattr(self, 'server_socket'): 
                 self.server_socket.close()
             return True 
         else : 
             print("No se puede desconectar el servidor, ya que posee clientes conectados")
+            self.list_clients()
             return False 
             
     def send_message_clients(self, msg):
@@ -143,19 +154,6 @@ class ServerTCP:
             for client in self.clients_connected.values() : 
                 client['socket'].send(buff_entry_encode)
 
-def loading(): 
-    string = "#"
-    for i in range(0,50):
-        clear_term()
-        percentage = (i + 1) * 2
-        print(f"Iniciando Servidor EPICARDIUM... {percentage}%")
-        print(f"{string} {'.' * (50 - len(string))}")
-        string = string + "#"
-        time.sleep(0.03)  # import time
-    clear_term()
-
-def clear_term():
-    os.system('cls' if os.name == 'nt' else 'clear')
 
 
 if __name__ == "__main__":
