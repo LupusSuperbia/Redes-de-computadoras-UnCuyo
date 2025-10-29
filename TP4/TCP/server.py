@@ -68,7 +68,7 @@ class ServerTCP:
                 #client_socket.send(what_to_send.encode('utf-8'))
                 self.send_message(what_to_send, client_address)
         except ConnectionResetError as cr : 
-            print(f'El cliente {client_name} ha cerrado abruptamente')
+            print(f'El cliente {client_name} ha cerrado abruptamente 🔥')
         except Exception as e : 
             print("Se ha producido un error :", e)
         finally : 

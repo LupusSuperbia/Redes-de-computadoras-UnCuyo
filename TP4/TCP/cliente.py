@@ -22,29 +22,28 @@ class ClienteTCP :
                 msg = input("#")
                 msg_complete = msg.encode()
                 if msg.lower() in ServerCommand.EXIT.value: 
-                    print(f"te has desconectado")
+                    print(f"Te has desconectado")
                     self.client_socket.send(msg_complete)
-                    self.running = False
                     self.running = False
                     if hasattr(self, 'client_socket'): 
                         self.client_socket.close()
-                    return True 
                     break
                 self.client_socket.send(msg_complete)
         except OSError as e: 
-            print('Que problema con el Winerror 10053')           
+            if self.running == False : 
+                print("La conexión se ha cerrado")
+            else : 
+                print(f'Error de conexión {e}')          
         except Exception as e : 
             print(e)
         finally :  
             self.client_socket.close()
-    def listen_server(self):
-        
+    def listen_server(self): 
         try : 
             while self.running : 
                 data = self.client_socket.recv(1024)
                 if not data:  # Servidor desconectado
                      print("El servidor se ha desconectado.")
-                     
                      break
                 print(data.decode('utf-8'))
         except OSError as e : 
@@ -62,9 +61,15 @@ if __name__ == "__main__":
     #loading() 
 
     host = input("Ingrese el host del servidor:") 
-    port = input("Ingrese el puerto : ")
+    while True :  
+        port_str = input("Ingrese el puerto : ")
+        try : 
+            port = int(port_str)
+            break
+        except Exception as e : 
+            print(f'El puerto tiene que ser un numero {e}')
 
-    cliente_socket = ClienteTCP(host, int(port))
+    cliente_socket = ClienteTCP(host, port)
     send_message = threading.Thread(target=cliente_socket.send_msg)
     listen_server = threading.Thread(target=cliente_socket.listen_server, daemon=True)
     send_message.start()

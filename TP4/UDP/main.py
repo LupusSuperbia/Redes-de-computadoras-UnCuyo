@@ -1,9 +1,11 @@
 import socket
 import threading
+import time
+from enum import Enum, auto
 
-BROADCAST_IP = "255.255.255.255"
-PORT = 60000
 
+class ComandoUDP(Enum):
+    EXIT = ('exit', 'desconectar', 'salir', 'quit')
 '''
 _create_udp_socket : 
 - Se encarga de la configuracion del socket para poder ser usado tanto por el proceso que envia 
@@ -12,50 +14,87 @@ al broadcast y al puerto, se utilizan funciones del import donde se setea las op
 del socket, una es para donde va a mandar los mensajes que este seria el SO_BROADCAST 
 y el otro es para que obtenga los paquetes y la direccion de donde la envian SO_REUSADDR
 '''
-def _create_udp_socket(bind=False):
-    sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    if bind : 
-        sock_udp.bind(("", PORT))
-    return sock_udp
+class ClientUDP : 
+    def __init__(self, port : int ):
+        self.port = port 
+        self.name = ''
+        self.broadcast_ip = "255.255.255.255"
+        self.socket_udp = self._create_udp_socket()
+        self.running = True
+
+    def _create_udp_socket(self):
+        sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock_udp.bind(("", self.port)) 
+        sock_udp.settimeout(1.0)
+        return sock_udp
 
 
-def _set_name(): 
-    print("Ingresa tu nombre:")
-    username = input()
-    return username 
+    def _set_name(self): 
+        print("Ingresa tu nombre:")
+        username = input()
+        self.name = username
 
-def join_chat(name, sock):
-    join_message = f"El usuario {name} se ha unido al chat"
-    sock.sendto(join_message.encode(), (BROADCAST_IP, PORT))
+    def join_chat(self):
+        join_message = f"El usuario {self.name} se ha unido al chat"
+        self.socket_udp.sendto(join_message.encode(), (self.broadcast_ip, self.port))
 
 
-def leave_chat(name, sock):
-    leave_message = f"El usuario {name} ha abandonado el chat"
-    sock.sendto(leave_message.encode(), (BROADCAST_IP, PORT))
+    def leave_chat(self):
+        leave_message = f"El usuario {self.name} ha abandonado el chat"
+        self.socket_udp.sendto(leave_message.encode(), (self.broadcast_ip, self.port))
 
-def send_to_udp(name):
-    sock = _create_udp_socket()
-    join_chat(name, sock)
-    try : 
-        while True : 
-            msg = input("¬ ")
-            message = f"El usuario {name} dice : {msg}"
-            sock.sendto(message.encode(), (BROADCAST_IP, PORT))
-            if msg.lower() == "exit": 
-                leave_chat(name, sock)
-                break
-    finally : 
-        sock.close()            
-def listen_udp():
-    sock = _create_udp_socket(bind=True)
-    print("Escuchando  la LAN 49.44 : ")
-    while True : 
-        (data, (address, port)) = sock.recvfrom(1024)
-        print(f"{data.decode()} ({address}:{port})")
+    def send_to_udp(self):
+        self.join_chat()
+        try : 
+            while self.running : 
+                msg = input("¬ ")
+                message = f"El usuario {self.name} dice : {msg}"
+                if msg.lower() in ComandoUDP.EXIT.value: 
+                    self.func_error()
+                    break
+                self.socket_udp.sendto(message.encode(), (self.broadcast_ip, self.port))
+        except ConnectionResetError as cr : 
+            print('Se desconecto abrupatemente', e)
+        except KeyboardInterrupt  as kr : 
+            self.func_error()
+            print("El cliente ha salido con el atajo de teclado CTRL-C ", kr)
+        except EOFError as ef : 
+            self.func_error()
+            print("El usuario ha interrumpido la conexión CTRL-C el hilo ha detenido", ef)
+        finally : 
+            self.socket_udp.close()          
+    
+    def func_error(self):
+        self.running = False
+        self.leave_chat()
 
+    def listen_udp(self):
+        print("Escuchando  la LAN 49.44 : ")
+        while self.running : 
+            try :
+                (data, (address, port)) = self.socket_udp.recvfrom(1024)
+                print(f"{data.decode()} ({address}:{port})")
+            except socket.timeout:
+                continue
+            except OSError:
+                if not self.running:
+                    break 
+                else:
+                    raise
 if __name__ == "__main__" : 
-    name = _set_name()
-    threading.Thread(target=listen_udp, daemon=True).start()
-    threading.Thread(target=send_to_udp, args=(name,)).start()
+    port = 60000
+    client_udp = ClientUDP(port)
+    client_udp._set_name()
+
+    listen_thread = threading.Thread(target=client_udp.listen_udp, daemon=True)
+    thread_send = threading.Thread(target=client_udp.send_to_udp, daemon=False)
+    listen_thread.start()
+    thread_send.start()
+    try : 
+        thread_send.join() 
+    except KeyboardInterrupt as kr : 
+        print("Se ha detenido el cliente UDP, ya no se puede recibir ni enviar mas datagramas", kr)
+        pass
+    print("El programa se cerro correctamente")
