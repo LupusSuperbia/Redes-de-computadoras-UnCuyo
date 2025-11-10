@@ -1,0 +1,74 @@
+/* 1. Box Sizing Reset (CRUCIAL) */
+/* Hace que 'padding' y 'border' se incluyan DENTRO del ancho/alto del elemento, no fuera. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  /* Elimina los márgenes predeterminados en todos los elementos para empezar de cero */
+  margin: 0; 
+  padding: 0;
+}
+
+/* 2. Base para la Tipografía y el Layout (Mejora la legibilidad) */
+body {
+  /* Mejora la representación de fuentes */
+  -webkit-font-smoothing: antialiased;
+  /* Asegura que la página ocupe al menos el alto total de la vista */
+  min-height: 100vh;
+  /* La siguiente línea es clave para flexbox/grid si lo usas, pero no obligatoria */
+  text-rendering: optimizeSpeed; 
+  line-height: 1.5; /* Espaciado entre líneas para mejor lectura */
+}
+
+/* 3. Estilos Responsivos (CRUCIAL para imágenes) */
+/* Asegura que las imágenes no desborden su contenedor en pantallas pequeñas */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 50%;
+  min-height: 50%;
+  margin: 0 auto;
+}
+
+/* 4. Estilos de Formulario y Texto */
+input,
+button,
+textarea,
+select {
+  font: inherit; /* Hereda la fuente del body para consistencia */:
+}
+
+.videojuego{ 
+text-align : center;
+align-items : center;
+background-color: #F54927;
+max-width: 100%;
+width: 400px;
+margin: 0 auto;
+}
+
+.videojuego_formulario img{ 
+ width: 200px;
+ height: 200px;
+}
+
+.videojuego_formulario label{ 
+font-weight : bold 
+}
+
+input[type="submit"]{
+	background-color : #7ba7;
+	margin-top: 10px;
+	border-radius: 5px;
+	padding : 5px 10px;
+	font-weight: bold;
+	width: 100%;
+}
+
+input[type="submit"]:hover{
+	background-color : #fefe;
+	cursor: pointer;
+}
