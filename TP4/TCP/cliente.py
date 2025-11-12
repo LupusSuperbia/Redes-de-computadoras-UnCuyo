@@ -1,7 +1,10 @@
 import socket 
 import threading
 from Comandos import ServerCommand, loading, clear_term
+import os
 
+SEPARATOR = "<SEPARATOR>"
+BUFFER_SIZE = 4096
 
 class ClienteTCP : 
     def __init__ (self, host : str , port : int): 
@@ -15,11 +18,56 @@ class ClienteTCP :
         return client_socket
 
 
+    def send_file(self, filepath):
+        """Envía un archivo al servidor, incluyendo metadatos."""
+        try:
+            filename = os.path.basename(filepath)
+            filesize = os.path.getsize(filepath)
+            
+            # 2. Enviar el encabezado (metadatos)
+            # Formato: FILE<SEPARATOR>nombre_archivo<SEPARATOR>tamaño_archivo
+            header = f"sendfile_{SEPARATOR}{filename}{SEPARATOR}{filesize}"
+            self.client_socket.send(header.encode())
+
+            # 3. Abrir y Enviar el Contenido del Archivo
+            with open(filepath, "rb") as f:
+                bytes_sent = 0
+                while True:
+                    # Leer el archivo en bloques (chunk)
+                    bytes_read = f.read(BUFFER_SIZE)
+                    if not bytes_read:
+                        # Se terminó de leer el archivo
+                        break
+                    
+                    # Enviar el bloque a través del socket
+                    self.client_socket.sendall(bytes_read)
+                    bytes_sent += len(bytes_read)
+
+                    # Opcional: Mostrar progreso
+                    progress = (bytes_sent / filesize) * 100
+                    print(f"\rEnviando... {progress:.2f}% ({bytes_sent}/{filesize} bytes)", end="")
+                
+                print("\nArchivo enviado con éxito.")
+        except FileNotFoundError:
+            print(f"Error: El archivo '{filepath}' no fue encontrado.")
+        except Exception as e:
+            print(f"Error al enviar el archivo: {e}")
 
     def send_msg(self):
         try : 
             while self.running : 
                 msg = input("#")
+
+
+                if msg.lower().startswith("sendfile "):
+                    filepath = msg[9:].strip() # Obtener la ruta después de "sendfile "
+                    if os.path.exists(filepath):
+                        print(f"Preparando para enviar: {filepath}")
+                        # Llama a la función de envío de archivo
+                        self.send_file(filepath)
+                    else:
+                        print(f"Ruta no válida o archivo no encontrado: {filepath}")
+                    continue # Volver a pedir input sin enviar el comando como texto
                 msg_complete = msg.encode()
                 if msg.lower() in ServerCommand.EXIT.value: 
                     print(f"Te has desconectado")

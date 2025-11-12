@@ -5,6 +5,10 @@ import os
 import time
 from Comandos import ServerCommand
 
+SEPARATOR = "<SEPARATOR>"
+BUFFER_SIZE= 4096 
+FILE_DESTINATION_FOLDER = "/home/ageri/Documents" # Carpeta donde se guardarán los archivos
+
 
 class ServerTCP: 
     
@@ -52,9 +56,52 @@ class ServerTCP:
                 self.clients_connected[client_address] = {'socket' : client_socket, 'name' : client_name }
             self.send_message(f"👋 Se ha conectado el cliente : {client_name}", client_address)
             while True : 
-                data = client_socket.recv(1024)
+                data = client_socket.recv(BUFFER_SIZE)
                 if not data : 
                     break
+                try:
+                    msg_decode = data.decode().strip()
+                except UnicodeDecodeError:
+                    # Si no es texto válido, podría ser un error o el inicio de datos binarios
+                    # sin un encabezado, lo trataremos como un error por ahora.
+                    print(f"[{client_name}]: Mensaje recibido no es texto. Ignorando.")
+                    continue
+                    
+                # 2. Verificar si es un comando de envío de archivo
+                if msg_decode.startswith(f"sendfile_{SEPARATOR}"):
+                    # El cliente está enviando un archivo.
+                    try:
+                        # Extraer metadatos
+                        parts = msg_decode.split(SEPARATOR)
+                        
+                        # Esperamos 3 partes: [0]=FILE, [1]=filename, [2]=filesize
+                        if len(parts) == 3 and parts[0] == "sendfile_":
+                            filename = parts[1]
+                            filesize = int(parts[2])
+                            
+                            print(f"\n[INFO] {client_name} intenta enviar archivo: '{filename}' ({filesize} bytes)")
+                            
+                            # Informar a otros clientes
+                            self.send_message(f"📢 {client_name} está enviando el archivo '{filename}'.", client_address)
+
+                            # Llama a la nueva función de recepción
+                            success = self._receive_file(client_socket, filename, filesize)
+                            
+                            if success:
+                                self.send_message(f"🎉 {client_name} ha enviado el archivo '{filename}' con éxito.", client_address)
+                            else:
+                                self.send_message(f"❌ Falló la recepción del archivo '{filename}' de {client_name}.", client_address)
+                                
+                            # Después de recibir el archivo, volvemos al inicio del bucle
+                            continue 
+                            
+                        else:
+                            print(f"[ERROR]: Formato de encabezado de archivo inválido de {client_name}")
+                            
+                    except ValueError:
+                        print(f"[ERROR]: Tamaño de archivo no es un número válido de {client_name}")
+                    except Exception as e:
+                        print(f"[ERROR] durante el manejo del encabezado de archivo: {e}")
                 msg_decode = data.decode()
                 if msg_decode.lower() in ServerCommand.EXIT.value  :
                     
@@ -77,7 +124,51 @@ class ServerTCP:
                     self.clients_connected.pop(client_address)
             client_socket.close()
             print(f'Conexión con {client_name} terminada')
+    
+
+
+    def _receive_file(self, client_socket, filename, filesize):
+        """Maneja la recepción de datos binarios del archivo."""
         
+        # 1. Crear la carpeta de destino si no existe
+        if not os.path.exists(FILE_DESTINATION_FOLDER):
+            os.makedirs(FILE_DESTINATION_FOLDER)
+            
+        filepath = os.path.join(FILE_DESTINATION_FOLDER, filename)
+        
+        try:
+            # 2. Abrir el archivo de destino en modo escritura binaria
+            with open(filepath, "wb") as f:
+                bytes_received = 0
+                
+                # Bucle de recepción: se ejecuta hasta que se reciben todos los bytes (filesize)
+                while bytes_received < filesize:
+                    # Calcular cuántos bytes quedan por recibir
+                    bytes_to_receive = filesize - bytes_received
+                    
+                    # Recibir solo un bloque (BUFFER_SIZE) o lo que queda, lo que sea menor
+                    data = client_socket.recv(min(BUFFER_SIZE, bytes_to_receive))
+                    
+                    if not data:
+                        # La conexión se cerró inesperadamente
+                        print(f"\nError: Conexión cerrada antes de completar el archivo.")
+                        return False
+
+                    # Escribir los bytes recibidos en el archivo
+                    f.write(data)
+                    bytes_received += len(data)
+                    
+                    # Opcional: Mostrar progreso en el servidor
+                    progress = (bytes_received / filesize) * 100
+                    print(f"\rRecibiendo {filename}... {progress:.2f}% ({bytes_received}/{filesize} bytes)", end="")
+
+                print(f"\n✅ Archivo '{filename}' recibido con éxito y guardado en: {filepath}")
+                return True
+                
+        except Exception as e:
+            print(f"Error durante la recepción/escritura del archivo: {e}")
+            return False
+    
     def send_message(self, msg, client_address):
         with self.lock : 
             try : 
