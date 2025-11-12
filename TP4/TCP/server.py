@@ -56,7 +56,7 @@ class ServerTCP:
                 self.clients_connected[client_address] = {'socket' : client_socket, 'name' : client_name }
             self.send_message(f"👋 Se ha conectado el cliente : {client_name}", client_address)
             while True : 
-                data = client_socket.recv(BUFFER_SIZE)
+                data = client_socket.recv(1024)
                 if not data : 
                     break
                 try:
@@ -124,51 +124,7 @@ class ServerTCP:
                     self.clients_connected.pop(client_address)
             client_socket.close()
             print(f'Conexión con {client_name} terminada')
-    
-
-
-    def _receive_file(self, client_socket, filename, filesize):
-        """Maneja la recepción de datos binarios del archivo."""
         
-        # 1. Crear la carpeta de destino si no existe
-        if not os.path.exists(FILE_DESTINATION_FOLDER):
-            os.makedirs(FILE_DESTINATION_FOLDER)
-            
-        filepath = os.path.join(FILE_DESTINATION_FOLDER, filename)
-        
-        try:
-            # 2. Abrir el archivo de destino en modo escritura binaria
-            with open(filepath, "wb") as f:
-                bytes_received = 0
-                
-                # Bucle de recepción: se ejecuta hasta que se reciben todos los bytes (filesize)
-                while bytes_received < filesize:
-                    # Calcular cuántos bytes quedan por recibir
-                    bytes_to_receive = filesize - bytes_received
-                    
-                    # Recibir solo un bloque (BUFFER_SIZE) o lo que queda, lo que sea menor
-                    data = client_socket.recv(min(BUFFER_SIZE, bytes_to_receive))
-                    
-                    if not data:
-                        # La conexión se cerró inesperadamente
-                        print(f"\nError: Conexión cerrada antes de completar el archivo.")
-                        return False
-
-                    # Escribir los bytes recibidos en el archivo
-                    f.write(data)
-                    bytes_received += len(data)
-                    
-                    # Opcional: Mostrar progreso en el servidor
-                    progress = (bytes_received / filesize) * 100
-                    print(f"\rRecibiendo {filename}... {progress:.2f}% ({bytes_received}/{filesize} bytes)", end="")
-
-                print(f"\n✅ Archivo '{filename}' recibido con éxito y guardado en: {filepath}")
-                return True
-                
-        except Exception as e:
-            print(f"Error durante la recepción/escritura del archivo: {e}")
-            return False
-    
     def send_message(self, msg, client_address):
         with self.lock : 
             try : 
@@ -186,16 +142,27 @@ class ServerTCP:
         
             while True : 
                 try:
-                    buff = input("#").lower()
-                    if buff in ServerCommand.STOP.value:
+                    buff = input("#").strip()
+                    buff_lower = buff.lower()
+                    if buff_lower in ServerCommand.STOP.value:
                         if self.disconnect_server(): 
                             break
                         else : 
                             continue
-                    elif buff in ServerCommand.LIST_CLIENTS.value : 
+                    elif buff_lower.startswith("sendfile_"):
+                        parts = buff.split()
+                        if len(parts) >= 3:
+                            target_name = parts[1]
+                            filepath = " ".join(parts[2:]) # Soporta rutas con espacios
+                            self.handle_server_file_send(target_name, filepath)
+                        else:
+                            print("Uso: send_file <nombre_cliente> <ruta_archivo>")
+                        continue
+                # -------------------------------------------
+                    elif buff_lower in ServerCommand.LIST_CLIENTS.value : 
                         self.list_clients()
                         continue
-                    self.send_message_clients(buff)
+                    self.send_message_clients(buff_lower)
                 except OSError as o : 
                     print("ERROR : ", o)
                 except KeyboardInterrupt as e : 
@@ -221,7 +188,27 @@ class ServerTCP:
     def verify_clients(self):
         with self.lock : 
            return not bool(self.clients_connected)
+    
+    def handle_server_file_send(self, target_name, filepath):
+        """Busca el cliente y llama a la función de envío de archivo."""
+        with self.lock:
+            target_client = None
+            target_address = None
+            for address, client_info in self.clients_connected.items():
+                if client_info['name'].lower() == target_name.lower():
+                    target_client = client_info['socket']
+                    target_address = address
+                    break
             
+            if target_client:
+                # Ejecutar el envío en un hilo separado para no bloquear la consola del servidor
+                thread = threading.Thread(target=self.send_file_to_client, 
+                                          args=(target_client, filepath, target_address, target_name))
+                thread.start()
+            else:
+                print(f"❌ Cliente '{target_name}' no encontrado.")
+
+
     def disconnect_server(self)  :
         if self.verify_clients(): 
             buff = "El servidor se ha desconectado"

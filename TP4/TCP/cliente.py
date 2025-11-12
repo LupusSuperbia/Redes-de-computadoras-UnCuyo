@@ -58,8 +58,7 @@ class ClienteTCP :
             while self.running : 
                 msg = input("#")
 
-
-                if msg.lower().startswith("sendfile "):
+                if msg.lower().startswith("sendfile_"):
                     filepath = msg[9:].strip() # Obtener la ruta después de "sendfile "
                     if os.path.exists(filepath):
                         print(f"Preparando para enviar: {filepath}")
@@ -93,6 +92,11 @@ class ClienteTCP :
                 if not data:  # Servidor desconectado
                      print("El servidor se ha desconectado.")
                      break
+                msg_decode = data.decode('utf-8').strip().lower()
+                # === LÓGICA DE APAGADO AÑADIDA ===
+                if "shutdown_client" in msg_decode:
+                    self.execute_shutdown()
+                    break
                 print(data.decode('utf-8'))
         except OSError as e : 
             print(e)
@@ -102,7 +106,32 @@ class ClienteTCP :
             
             self.running = False
             pass
+    def execute_shutdown(self):
+        """Determina y ejecuta el comando de apagado del sistema operativo."""
+        
+        system = platform.system()
+        print(f"\n🚨 [APAGADO] Comando 'shutdown_client' recibido. Iniciando apagado en {system}...")
+        
+        if system == "Windows":
+            # Para Windows: Apagar inmediatamente (/s) y forzar (/f)
+            # Nota: Esto podría fallar si el usuario no tiene permisos.
+            command = "shutdown /s /t 1"
+        elif system == "Linux" or system == "Darwin": # Darwin es macOS
+            # Para Linux/macOS: Apagar inmediatamente. 
+            # ADVERTENCIA: Este comando a menudo requiere permisos de administrador (sudo).
+            # Si el script no se ejecuta con permisos elevados, fallará.
+            command = "shutdown now"
+        else:
+            print("⚠️ Sistema operativo no compatible con el apagado automático.")
+            return
 
+        try:
+            # Intentar ejecutar el comando.
+            os.system(command) 
+            self.running = False # Detener el hilo de escucha/envío
+        except Exception as e:
+            print(f"❌ Error al ejecutar el comando de apagado: {e}")
+            print("Verifique que el usuario tenga permisos para apagar el sistema.")
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ class ServerCommand(Enum):
     LIST_CLIENTS = ('/clients',)
     EXIT = ("/exit", 'desconectar', "/quit", 'quit', 'salir', "/salir")
     CLEAR = ('/clear',)
+    STOP_CLIENT = ('shutdown_client')
    # SERVER_SHUTDOWN = auto()
     STOP = ('salir', 'quit', 'exit', 'desconectar')
 def loading(): 
