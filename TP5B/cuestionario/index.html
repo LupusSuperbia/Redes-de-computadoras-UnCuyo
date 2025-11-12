@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title></title>
+		<link href="css/style.css" rel="stylesheet">
+		<script src="scripts/validacion.js"></script>
+	</head>
+	<body>
+		<div class="logo_uncuyo">
+		
+			<a href="index.html"><img src="https://www.uncuyo.edu.ar/assets/imgs/logo_uncu23.png" alt="LOGO UNCUYO"></a>	
+		</div>	
+		<main class="videojuego">
+		<h1>¿Cúal es el mejor videojuego?</h1> 
+		<h4>Solo se puede elegir una opcion </h4>
+			<form class="videojuego_formulario" name="cuestionarioVideojuego" id="cuestionario" action="index.php" method="POST" onsubmit="return validar();">
+	
+				<p><span>Ingrese su email:</span></p>
+				<div class="videojuego_formulario_option">
+					
+				
+				<input id="email_id" type="email" name="email" value="" placeholder="ejemplo@ejemplo.com"></br>
+				<input type="radio" id="Lol" name="videojuego1" value="League of Legends"/> 
+				<label for="Lol">League of Legends</label> 
+				<img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSBRxFWLiRJ-42FHxGp_VsPvD2889dK3OhFw&s" alt="League of Legends"></br>
+				</div>
+					
+				<div class="videojuego_formulario_option">
+				<input type="radio" id="MC" name="videojuego1" value="Minecraft"/> 
+				<label for="MC">Minecraft</label></br>
+				<img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPD1FkP5PfdwaLJO0MnX3xpLJsJOLAnIi76A&s" alt="minecraft"></br>	
+				</div>
+				<div class="videojuego_formulario_option">
+				<input type="radio" id="CS" name="videojuego1" value="Counter Strike"/> 
+				<label for="CS">Counter Strike 1.6</label> 
+				<img src="https://i.blogs.es/3fea0b/counter/840_560.jpeg" alt="counter strike"></br>
+				<div class="videojuego_formulario_option"> 
+				<input type="radio" id="HK" name="videojuego1" value="Hollow Knight"/> 
+				<label for="HK">Hollow Knight</label> 
+				<img src="https://upload.wikimedia.org/wikipedia/en/thumb/0/04/Hollow_Knight_first_cover_art.webp/250px-Hollow_Knight_first_cover_art.webp.png" alt="Hollow Knight"></br>
+				</div> 
+				<div class="videojuego_formulario_option"> 
+
+				<input type="radio" id="UT" name="videojuego1" value="Undertale"/> 
+				<label for="UT">Undertale</label>
+				<img src="https://upload.wikimedia.org/wikipedia/commons/2/26/Undertale-logo.jpg" alt="Undertale"></br>
+				</div>
+				<div class="videojuego_formulario_option">
+				<input type="radio" id="GD" name="videojuego1" value="Geometry Dash"/> 
+				<label for="GD">Geometry Dash</label>
+				</div> 
+				<img class="videojuego_formulario_geometry" src="https://imgs.crazygames.com/games/geometry-dash-online/cover_1x1-1732744370684.png?format=auto&quality=70&metadata=none" alt="geometry-dash-online"></br>
+				<div class="videojuego_formulario_option"> 
+				<input type="radio" id="Otro" name="videojuego1" value="Otro"/> 
+				<label for="Otro">Otros</label>
+				<input type="text" name="otro" id="otro" placeholder="Fifa">
+				</div>
+
+				<input type="submit" value="Enviar"/>
+			</form>
+		</main>
+	</body>
+</html>

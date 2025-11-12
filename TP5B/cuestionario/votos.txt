@@ -1,0 +1,2 @@
+League of Legends=1
+Geometry Dash=1
